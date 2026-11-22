@@ -215,14 +215,16 @@ function renderDetail() {
   </div>
   <div class="d-title"><h1>${esc(s.title)}</h1>${s.artist ? `<div>${esc(s.artist)}</div>` : ''}</div>`;
   const yt = `<a class="card yt" href="${ytUrl(s)}" target="_blank" rel="noopener">${ICON.yt}유튜브에서 노래방 영상 검색</a>`;
-  const pron = `<button class="card pron-row" data-act="${s.pron ? 'pron-open' : 'pron-edit'}"><span>외국어 발음</span><em class="${s.pron ? '' : 'dim'}">${s.pron ? '보기' : '추가'}${ICON.chev}</em></button>`;
-  const memo = s.memo
-    ? `<section class="card"><div class="card-h"><span>메모</span><span class="card-acts"><button data-act="memo">편집</button><button class="red" data-act="memo-del">삭제</button></span></div><p class="memo">${esc(s.memo)}</p></section>`
-    : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
+  // 캔버스대로: 메모 카드 안, 구분선 아래에 외국어 발음 줄
+  const memo = `<section class="card memo-card">
+    <div class="card-h"><span>메모</span>${s.memo ? '<span class="card-acts"><button data-act="memo">편집</button><button class="red" data-act="memo-del">삭제</button></span>' : ''}</div>
+    ${s.memo ? `<p class="memo">${esc(s.memo)}</p>` : '<button class="memo empty-memo" data-act="memo">최고음, 주의할 구간 등을 적어두세요</button>'}
+    <button class="pron-row" data-act="${s.pron ? 'pron-open' : 'pron-edit'}"><span>외국어 발음</span><em>${s.pron ? '보기' : '추가'}${ICON.chev}</em></button>
+  </section>`;
 
   if (s.status === 'wish') {
     $('#detail').innerHTML = head('불러볼 곡', `<button class="link more" data-act="menu" aria-label="더보기">${ICON.more}</button>`)
-      + `<div class="d-gap"></div>${yt}${memo}${pron}${recSection(s)}
+      + `<div class="d-gap"></div>${yt}${memo}${recSection(s)}
       <button class="primary" data-act="move">내 곡으로 옮기기</button>`;
     return;
   }
@@ -233,13 +235,13 @@ function renderDetail() {
     <div class="card-h"><span>예약할 키</span><b>${fmtKey(s.gender, s.key)}</b></div>
     ${dpick('gender', GENDERS)}
     <div class="big-step">
-      <button data-act="dkey" data-v="-1" aria-label="키 내리기">−</button>
+      <button data-act="dkey" data-v="-1" aria-label="키 내리기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
       <b aria-live="polite">${fmtNum(s.key)}</b>
-      <button data-act="dkey" data-v="1" aria-label="키 올리기">+</button>
+      <button data-act="dkey" data-v="1" aria-label="키 올리기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
   </section>
   <section class="card card-row"><span>등급</span>${dpick('grade', GRADES, 'grades')}</section>
-  ${yt}${memo}${pron}${recSection(s)}`;
+  ${yt}${memo}${recSection(s)}`;
 }
 
 const recLabel = (at) => {

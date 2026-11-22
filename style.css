@@ -99,10 +99,10 @@ textarea{height:96px;border:none;border-radius:16px;background:var(--field);font
 .card-row > span{font-size:14px;font-weight:700;color:var(--muted);flex-shrink:0}
 .card-row .seg{flex:1}
 .big-step{display:flex;align-items:center;justify-content:space-between}
-.big-step button{width:52px;height:52px;border:none;border-radius:16px;background:var(--accent-bg);color:var(--accent);font-size:26px;font-weight:900}
+.big-step button{width:52px;height:52px;border:none;border-radius:16px;background:var(--accent-bg);color:var(--accent);display:flex;align-items:center;justify-content:center}
 .big-step b{font-size:44px;font-weight:900;color:var(--accent)}
 .yt{flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:0;height:52px;border-radius:16px;color:var(--ink);text-decoration:none;font-size:16px;font-weight:700}
-.memo{margin:-8px 0 0;font-size:15px;font-weight:500;line-height:1.5;color:#E4E5E8;white-space:pre-wrap}
+.memo{margin:0;font-size:15px;font-weight:500;line-height:1.5;color:#E4E5E8;white-space:pre-wrap}
 
 /* 불러볼 곡 */
 .top.col{flex-direction:column;align-items:flex-start}
@@ -140,12 +140,11 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 .action .red{color:#FF6B78}
 .action-cancel{border-radius:14px;font-weight:900!important}
 
-.memo-card{width:calc(100% - 32px);border:none;text-align:left;color:inherit;font:inherit}
 .card-acts{display:flex;gap:4px;margin:-12px -10px -12px 0}
 .card-acts button{height:40px;padding:0 10px;border:none;background:transparent;color:var(--accent);font-size:14px;font-weight:700}
 .card-acts .red{color:#FF6B78}
 .card-h em{font-style:normal;color:var(--accent)}
-.empty-memo .memo{color:#6B6F77}
+.memo.empty-memo{color:#6B6F77}
 
 /* 설정 */
 .set-card{border-radius:16px;background:var(--card);overflow:hidden}
@@ -187,10 +186,11 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 .rec-note{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--muted)}
 
 /* 외국어 발음 */
-.pron-row{flex-direction:row;align-items:center;justify-content:space-between;width:calc(100% - 32px);padding:16px 18px;border:none;color:inherit;font-size:15px;font-weight:700;text-align:left}
-.pron-row span{color:var(--ink)}
-.pron-row em{display:flex;align-items:center;gap:2px;font-style:normal;font-size:14px;color:var(--accent)}
-.pron-row em.dim{color:var(--muted)}
+.memo-card{gap:0;padding:14px 18px}
+.memo-card .card-h{margin-bottom:6px}
+.empty-memo{width:100%;padding:0;border:none;background:transparent;text-align:left;font-size:15px;line-height:1.5}
+.pron-row{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;margin-top:12px;padding:12px 0 0;border:none;border-top:1px solid #222428;background:transparent;color:var(--ink);font-size:15px;font-weight:700;text-align:left}
+.pron-row em{display:flex;align-items:center;gap:2px;font-style:normal;font-size:14px;font-weight:700;color:var(--muted)}
 .pron{display:flex;flex-direction:column;gap:40px;padding:28px 24px 0}
 .pron section{display:flex;flex-direction:column;gap:10px}
 .pron h2{margin:0;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.02em}
