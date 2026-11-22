@@ -99,7 +99,7 @@ $('#app').innerHTML = `
   <div id="list"></div>
 </main>
 <main class="page" id="wish" hidden>
-  <header class="top col"><h1>불러볼 곡</h1><p class="sub">어디서 듣고 꽂힌 노래, 일단 적어두기</p></header>
+  <header class="top"><h1>불러볼 곡</h1></header>
   <form class="quick" id="wform">
     <label class="sr" for="wt">제목</label>
     <input id="wt" placeholder="제목" autocomplete="off" enterkeyhint="next">
