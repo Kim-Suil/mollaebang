@@ -127,12 +127,17 @@ function renderList() {
   $('#list').innerHTML = scope + groups.map((g) => `
     <div class="group-h"><span class="dot" style="background:${GRADE_COLOR[g.grade]}"></span><b>${g.grade}</b><span>${g.songs.length}</span></div>
     ${g.songs.map((s) => `
-      <button class="row" data-id="${s.id}">
-        <div class="row-in">
-          <div class="row-t"><b>${esc(s.title)}</b>${s.artist ? `<span>${esc(s.artist)}</span>` : ''}</div>
-          <div class="key"><span>${s.gender}</span><b>${fmtNum(s.key)}</b></div>
+      <div class="swipe">
+        <button class="swipe-del" data-del="${s.id}">삭제</button>
+        <div class="swipe-in">
+          <button class="row" data-id="${s.id}">
+            <div class="row-in">
+              <div class="row-t"><b>${esc(s.title)}</b>${s.artist ? `<span>${esc(s.artist)}</span>` : ''}</div>
+              <div class="key"><span>${s.gender}</span><b>${fmtNum(s.key)}</b></div>
+            </div>
+          </button>
         </div>
-      </button>`).join('')}`).join('');
+      </div>`).join('')}`).join('');
 }
 
 function renderWish() {
