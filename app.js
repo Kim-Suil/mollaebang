@@ -95,7 +95,16 @@ $('#app').innerHTML = `
   <button data-tab="wish">${ICON.heart}불러볼 곡</button>
 </nav>
 <div id="sheet"></div>
-<div id="menu"></div>`;
+<div id="menu"></div>
+<div id="toast" role="status" aria-live="polite"></div>`;
+
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
 
 // ── 화면 그리기 ──
 function renderView() {
@@ -299,7 +308,7 @@ async function save() {
   songs = songs.filter((s) => s.id !== song.id).concat(song);
   draft = null;
   if (kind === 'mine' && mode !== 'edit') { ui.cat = song.cat; pref.set('cat', ui.cat); }
-  if (mode === 'move') { ui.tab = 'mine'; ui.open = song.id; window.scrollTo(0, 0); } // 옮긴 곡 상세로
+  if (mode === 'move') { ui.open = null; toast(`'${song.title}' 곡을 내 곡 › ${song.cat}에 추가했어요`); } // 불러볼 곡 목록에 그대로 머문다
   renderSheet(); renderAll();
 }
 
