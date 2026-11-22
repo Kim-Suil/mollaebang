@@ -85,3 +85,29 @@ export function pickRec(songRecs, pinId) {
 }
 
 export const fmtDur = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+
+// ── 녹음 → WAV ──
+// 아이폰 MediaRecorder(mp4)가 앞 1~2초만 재생되는 버그가 있어, 마이크 소리를 직접 받아 WAV로 만든다.
+// 모노·16비트. rate를 절반으로 줄여(48k→24k) 1분에 약 2.9MB.
+export function downsample(samples, factor) {
+  if (factor <= 1) return samples;
+  const out = new Float32Array(Math.floor(samples.length / factor));
+  for (let i = 0; i < out.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < factor; j++) sum += samples[i * factor + j];
+    out[i] = sum / factor; // 평균 = 간단한 저역 필터
+  }
+  return out;
+}
+
+export function encodeWav(samples, sampleRate) {
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  samples.forEach((x, i) => { const c = Math.max(-1, Math.min(1, x)); v.setInt16(44 + i * 2, c < 0 ? c * 0x8000 : c * 0x7fff, true); });
+  return buf;
+}

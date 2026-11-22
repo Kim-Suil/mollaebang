@@ -1,6 +1,6 @@
 // 실행: node test.mjs
 import assert from 'node:assert/strict';
-import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur } from './logic.js';
+import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav } from './logic.js';
 
 assert.equal(fmtKey('원키', -2), '원키 -2');
 assert.equal(fmtKey('남키', 0), '남키 0');
@@ -66,5 +66,15 @@ assert.equal(pickRec(recs, 'gone').id, 'y');
 assert.equal(pickRec([], undefined), null);
 assert.equal(fmtDur(222), '3:42');
 assert.equal(fmtDur(5), '0:05');
+
+// WAV: 헤더와 길이
+const ds = downsample(new Float32Array([0, 1, 1, 1, -1, -1, 0.5]), 2);
+assert.deepEqual([...ds], [0.5, 1, -1]);
+const wav = new DataView(encodeWav(new Float32Array([0, 1, -1]), 24000));
+const tag = (o) => String.fromCharCode(...[0, 1, 2, 3].map((i) => wav.getUint8(o + i)));
+assert.equal(tag(0), 'RIFF'); assert.equal(tag(8), 'WAVE'); assert.equal(tag(36), 'data');
+assert.equal(wav.byteLength, 44 + 6);
+assert.equal(wav.getUint32(24, true), 24000);
+assert.deepEqual([wav.getInt16(44, true), wav.getInt16(46, true), wav.getInt16(48, true)], [0, 32767, -32768]);
 
 console.log('ok');

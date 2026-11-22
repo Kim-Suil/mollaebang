@@ -1,4 +1,4 @@
-import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur } from './logic.js';
+import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav } from './logic.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -407,43 +407,50 @@ async function remove(id) {
 }
 
 // ── 녹음 ──
-let rec = null; // 녹음 중: { mr, chunks, start, songId, stream, timer }
+let rec = null; // 녹음 중: { ctx, src, node, stream, chunks, start, songId, timer, cut }
 async function startRec(songId) {
-  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) return alert('이 기기에서는 녹음을 쓸 수 없어요.');
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC || !navigator.mediaDevices?.getUserMedia) return alert('이 기기에서는 녹음을 쓸 수 없어요.');
+  const ctx = new AC(); // 아이폰은 누른 순간에 만들어야 소리가 켜진다
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) {
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); } catch (e) {
+    ctx.close();
     alert(e.name === 'NotAllowedError'
       ? '마이크 권한이 꺼져 있어요.\n아이폰 설정 › 앱 › Safari › 마이크에서 허용한 뒤 다시 눌러주세요.'
       : '마이크를 켜지 못했어요. 다시 시도해주세요.');
     return;
   }
   player.pause();
-  // 기기가 지원하는 형식으로 녹음하고, 실제 형식(mime)을 같이 저장한다
-  const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported(t));
-  const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-  rec = { mr, chunks: [], start: Date.now(), songId, stream };
-  mr.ondataavailable = (e) => e.data.size && rec?.chunks.push(e.data);
-  mr.onstop = finishRec;
-  mr.onerror = () => { toast('녹음 중 문제가 생겨서 멈췄어요'); };
-  // ponytail: 조각(timeslice)으로 녹음하면 아이폰 mp4가 앞 몇 초만 재생돼서, 멈출 때 한 덩어리로 받는다
-  mr.start();
+  await ctx.resume();
+  const src = ctx.createMediaStreamSource(stream);
+  // ponytail: ScriptProcessor는 구식이지만 파일 하나로 끝나고 아이폰에서 동작. AudioWorklet은 필요해지면.
+  const node = ctx.createScriptProcessor(4096, 1, 1);
+  rec = { ctx, src, node, stream, chunks: [], start: Date.now(), songId };
+  node.onaudioprocess = (e) => rec && rec.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  src.connect(node); node.connect(ctx.destination); // 출력은 무음(0)이라 스피커로 안 나온다
   rec.timer = setInterval(() => {
     const el = $('#rec-time');
     if (el && rec) el.textContent = fmtDur(Math.floor((Date.now() - rec.start) / 1000));
   }, 500);
   renderDetail();
 }
-const stopRec = () => { if (rec && rec.mr.state !== 'inactive') rec.mr.stop(); };
+const stopRec = () => { if (rec) finishRec(); };
 
 async function finishRec() {
   const r = rec;
   rec = null;
   clearInterval(r.timer);
+  r.node.disconnect(); r.src.disconnect();
   r.stream.getTracks().forEach((t) => t.stop());
-  const dur = Math.round((Date.now() - r.start) / 1000);
-  if (!r.chunks.length || dur < 1) { renderDetail(); return toast('녹음이 너무 짧아서 저장하지 않았어요'); }
-  const blob = new Blob(r.chunks, { type: r.mr.mimeType || r.chunks[0].type });
-  const item = { id: newId(), songId: r.songId, at: r.start, dur, mime: blob.type, blob };
+  const rate = r.ctx.sampleRate;
+  r.ctx.close();
+  const total = r.chunks.reduce((n, c) => n + c.length, 0);
+  if (total < rate) { renderDetail(); return toast('녹음이 너무 짧아서 저장하지 않았어요'); }
+  const all = new Float32Array(total);
+  let o = 0; r.chunks.forEach((c) => { all.set(c, o); o += c.length; });
+  const factor = rate >= 32000 ? 2 : 1;
+  const blob = new Blob([encodeWav(downsample(all, factor), rate / factor)], { type: 'audio/wav' });
+  const item = { id: newId(), songId: r.songId, at: r.start, dur: Math.round(total / rate), mime: 'audio/wav', blob };
   try { await dbPutRec(item); } catch (e) {
     // 저장이 끝난 녹음만 목록에 넣는다. 기존 녹음은 그대로.
     toast(e?.name === 'QuotaExceededError' ? '저장 공간이 부족해서 새 녹음을 저장하지 못했어요' : `새 녹음을 저장하지 못했어요 (${e?.name || e})`);
