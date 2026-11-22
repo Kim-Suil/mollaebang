@@ -194,3 +194,5 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 .pron h2{margin:0;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.02em}
 .pron p{margin:0;font-size:24px;font-weight:700;line-height:1.5;color:var(--ink);word-break:keep-all;overflow-wrap:anywhere}
 .pron-input{min-height:50vh;font-size:17px;line-height:1.6}
+.pron-input.sm{min-height:160px}
+.add-link{align-self:flex-start;margin-top:12px;height:44px;padding:0 4px;border:none;background:transparent;color:var(--accent);font-size:15px;font-weight:700}

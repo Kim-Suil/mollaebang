@@ -369,6 +369,11 @@ function renderSheet() {
       ${draft.mode === 'wedit' ? `<div class="hint" id="hint" aria-live="polite">${hint}</div>` : ''}
       <div class="label"><label for="f-memo">메모</label></div>
       <textarea id="f-memo" data-f="memo" placeholder="최고음, 주의할 구간 등">${esc(draft.memo)}</textarea>
+      ${draft.pron || draft.showPron ? `
+      <div class="label"><label for="f-pron">외국어 발음</label></div>
+      <textarea id="f-pron" class="pron-input sm" data-f="pron" placeholder="1절\n헤이 굿모닝 에브리원\n\n후렴\n아이 필 소 굿">${esc(draft.pron || '')}</textarea>
+      <p class="set-note">1절, 후렴처럼 구간 이름만 있는 줄은 구간 제목으로 보여요.</p>`
+      : '<button class="add-link" data-act="show-pron">+ 외국어 발음 추가 (선택)</button>'}
       ${draft.mode === 'edit' ? '<button class="danger" data-act="delete">곡 삭제</button>' : ''}
       ${isMove ? `
       <div class="move-foot">
@@ -410,7 +415,8 @@ async function save() {
   const kind = kindOf(draft);
   if (missingHint(draft, kind)) return;
   const now = Date.now();
-  const { mode, ...rest } = draft;
+  const { mode, showPron, ...rest } = draft;
+  rest.pron = (rest.pron || '').trim();
   const song = {
     ...rest,
     id: rest.id || newId(),
@@ -657,6 +663,7 @@ document.addEventListener('click', (e) => {
   if (act === 'key') { draft.key = clampKey(draft.key + Number(t.dataset.v)); return renderSheet(); }
   if (act === 'dkey') return patchOpen({ key: clampKey(find(ui.open).key + Number(t.dataset.v)) });
   if (act === 'back') { stopRec(); ui.open = null; return renderView(); }
+  if (act === 'show-pron') { draft.showPron = true; renderSheet(); return $('#f-pron').focus(); }
   if (act === 'pron-open') { ui.pron = true; window.scrollTo(0, 0); return renderDetail(); }
   if (act === 'pron-back') { ui.pron = false; return renderDetail(); }
   if (act === 'pron-edit') { const s = find(ui.open); draft = { mode: 'pron', id: s.id, pron: s.pron || '' }; renderSheet(); return $('#f-pron').focus(); }
