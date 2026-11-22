@@ -38,3 +38,31 @@ export function groupSongs(songs, { cat, sort, query }) {
 // 불러볼 곡: 최근에 담은 곡이 위로
 export const wishList = (songs) =>
   songs.filter((s) => s.status === 'wish').sort((a, b) => b.createdAt - a.createdAt);
+
+// ── 백업 ──
+// 형식 버전: 녹음이 들어가면 2로 올리고, 1도 계속 읽을 수 있게 한다.
+export const BACKUP_VERSION = 1;
+export const makeBackup = (songs, now = Date.now()) =>
+  ({ app: 'mollaebang', version: BACKUP_VERSION, exportedAt: now, songs });
+
+// 백업 파일 텍스트 → 곡 목록. 문제가 있으면 사용자에게 보여줄 문장을 담아 throw.
+export function parseBackup(text) {
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error('백업 파일을 읽을 수 없어요'); }
+  if (!data || data.app !== 'mollaebang' || !Array.isArray(data.songs)) throw new Error('몰래방 백업 파일이 아니에요');
+  if (!(data.version >= 1) || data.version > BACKUP_VERSION) throw new Error('앱을 업데이트한 뒤 다시 시도해주세요 (새 버전 백업)');
+  const ids = new Set();
+  data.songs.forEach((s, i) => {
+    const bad = (why) => { throw new Error(`백업 파일이 손상됐어요 (${i + 1}번째 곡: ${why})`); };
+    if (!s || typeof s.id !== 'string' || !s.id || ids.has(s.id)) bad('id');
+    ids.add(s.id);
+    if (typeof s.title !== 'string' || !s.title.trim()) bad('제목');
+    if (s.status !== 'wish' && s.status !== 'mine') bad('상태');
+    if (s.status === 'mine') {
+      if (!CATS.includes(s.cat)) bad('카테고리');
+      if (!GRADES.includes(s.grade)) bad('등급');
+      if (!GENDERS.includes(s.gender) || !Number.isInteger(s.key)) bad('키');
+    }
+  });
+  return data.songs;
+}

@@ -1,4 +1,4 @@
-import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList } from './logic.js';
+import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup } from './logic.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -29,6 +29,8 @@ async function tx(mode, fn) {
 const dbAll = () => tx('readonly', (s) => s.getAll());
 const dbPut = (song) => tx('readwrite', (s) => s.put(song));
 const dbDel = (id) => tx('readwrite', (s) => s.delete(id));
+// 복원: 한 트랜잭션으로 비우고 다시 채운다. 중간에 실패하면 통째로 취소돼 기존 데이터가 남는다.
+const dbReplaceAll = (list) => tx('readwrite', (s) => { s.clear(); list.forEach((x) => s.put(x)); return s.count(); });
 
 // ── 상태 ──
 // 곡 하나 = 레코드 하나. status: 'wish'(불러볼 곡) → 'mine'(내 곡). 옮겨도 id·메모 유지.
@@ -36,11 +38,12 @@ let songs = [];
 // 열려 있는 시트. mode: 'add'(내 곡 추가) | 'edit'(내 곡 편집) | 'wedit'(불러볼 곡 편집) | 'move'(내 곡에 저장)
 let draft = null;
 // tab: 'mine' | 'wish', open: 상세로 연 곡 id, menu: ⋯ 메뉴 열림
-const ui = { tab: 'mine', open: null, menu: false, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
+const ui = { tab: 'mine', open: null, menu: false, settings: false, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
 if (!SORTS.includes(ui.sort)) ui.sort = SORTS[0];
 const find = (id) => songs.find((s) => s.id === id);
 
 const ICON = {
+  gear: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F8CFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   sort: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F8CFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>',
   plus: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F8CFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   search: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA0A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
@@ -59,6 +62,7 @@ $('#app').innerHTML = `
   <header class="top">
     <h1>내 곡</h1>
     <div class="icons">
+      <button class="icon-btn" data-act="settings" aria-label="설정">${ICON.gear}</button>
       <label class="icon-btn" aria-label="정렬">${ICON.sort}
         <select id="sort">${SORTS.map((o) => `<option ${o === ui.sort ? 'selected' : ''}>${o}</option>`).join('')}</select>
       </label>
@@ -148,7 +152,9 @@ function renderDetail() {
   </div>
   <div class="d-title"><h1>${esc(s.title)}</h1>${s.artist ? `<div>${esc(s.artist)}</div>` : ''}</div>`;
   const yt = `<a class="card yt" href="${ytUrl(s)}" target="_blank" rel="noopener">${ICON.yt}유튜브에서 노래방 영상 검색</a>`;
-  const memo = s.memo ? `<section class="card"><div class="card-h"><span>메모</span></div><p class="memo">${esc(s.memo)}</p></section>` : '';
+  const memo = s.memo
+    ? `<button class="card memo-card" data-act="memo"><div class="card-h"><span>메모</span><em>편집</em></div><p class="memo">${esc(s.memo)}</p></button>`
+    : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span><em>+ 추가</em></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
 
   if (s.status === 'wish') {
     $('#detail').innerHTML = head('불러볼 곡', `<button class="link more" data-act="menu" aria-label="더보기">${ICON.more}</button>`)
@@ -173,6 +179,26 @@ function renderDetail() {
 }
 
 function renderMenu() {
+  document.body.style.overflow = ui.settings || draft ? 'hidden' : '';
+  if (ui.settings) {
+    const last = pref.get('lastBackup');
+    const mineN = songs.filter((s) => s.status === 'mine').length;
+    $('#menu').innerHTML = `
+  <div class="sheet-bg" data-act="set-close"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-label="설정">
+    <div class="sheet-h"><span></span><h2>설정</h2><button class="link save" data-act="set-close">완료</button></div>
+    <div class="sheet-b">
+      <div class="label">백업</div>
+      <div class="set-card">
+        <p class="set-info">내 곡 ${mineN}개 · 불러볼 곡 ${songs.length - mineN}개<br>마지막 백업: ${last ? new Date(Number(last)).toLocaleDateString('ko-KR') : '없음'}</p>
+        <button class="set-btn" data-act="export">백업 파일 내보내기</button>
+        <label class="set-btn">백업에서 복원<input type="file" id="importf" accept=".json,application/json" hidden></label>
+      </div>
+      <p class="set-note">곡은 이 폰에만 저장돼요. 내보낸 백업 파일은 "파일에 저장"으로 파일 앱(iCloud Drive 등)에 보관하세요.<br>복원하면 지금 곡이 백업 파일 내용으로 바뀌어요.</p>
+    </div>
+  </section>`;
+    return;
+  }
   $('#menu').innerHTML = ui.menu ? `
   <div class="sheet-bg" data-act="menu-close"></div>
   <div class="action" role="dialog" aria-modal="true" aria-label="더보기">
@@ -288,6 +314,36 @@ async function remove(id) {
   return true;
 }
 
+// ── 백업 ──
+async function exportBackup() {
+  const name = `몰래방-백업-${new Date().toLocaleDateString('sv-SE')}.json`;
+  const file = new File([JSON.stringify(makeBackup(songs))], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
+    else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') alert('내보내지 못했어요.');
+    return;
+  }
+  pref.set('lastBackup', String(Date.now()));
+  renderMenu();
+}
+
+async function importBackup(file) {
+  let list;
+  try { list = parseBackup(await file.text()); } catch (e) { alert(`${e.message}\n지금 곡은 그대로예요.`); return; }
+  if (!confirm(`지금 곡 ${songs.length}개가 백업의 곡 ${list.length}개로 바뀌어요.\n복원할까요?`)) return;
+  try { await dbReplaceAll(list); } catch { alert('복원하지 못했어요. 지금 곡은 그대로예요.'); return; }
+  songs = list;
+  ui.open = null; ui.settings = false;
+  renderMenu(); renderAll();
+  alert(`곡 ${list.length}개를 복원했어요.`);
+}
+
 async function quickAdd() {
   const title = $('#wt').value.trim();
   if (!title) return;
@@ -358,7 +414,11 @@ document.addEventListener('click', (e) => {
   if (act === 'back') { ui.open = null; return renderView(); }
   if (act === 'edit') return openSheet('edit', find(ui.open));
   if (act === 'move') return openSheet('move', find(ui.open));
+  if (act === 'memo') { const s = find(ui.open); openSheet(s.status === 'wish' ? 'wedit' : 'edit', s); return $('#f-memo').focus(); }
   if (act === 'menu') { ui.menu = true; return renderMenu(); }
+  if (act === 'settings') { ui.settings = true; return renderMenu(); }
+  if (act === 'set-close') { ui.settings = false; return renderMenu(); }
+  if (act === 'export') return exportBackup();
   if (act === 'menu-close') { ui.menu = false; return renderMenu(); }
   if (act === 'wedit') { ui.menu = false; renderMenu(); return openSheet('wedit', find(ui.open)); }
   if (act === 'wdel') return remove(ui.open);
@@ -376,6 +436,11 @@ $('#wform').addEventListener('submit', (e) => {
   if (document.activeElement === $('#wt') && !$('#wa').value) return $('#wa').focus(); // 제목에서 엔터 → 가수 칸으로
   quickAdd();
 });
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'importf' || !e.target.files[0]) return;
+  importBackup(e.target.files[0]);
+  e.target.value = '';
+});
 $('#sort').addEventListener('change', (e) => { ui.sort = e.target.value; pref.set('sort', ui.sort); renderList(); });
 
 // ── 시작 ──
@@ -388,5 +453,4 @@ fixGap(); addEventListener('resize', fixGap);
 navigator.storage?.persist?.(); // 저장 공간 유지 요청 (거절돼도 동작은 같음)
 navigator.serviceWorker?.register('sw.js').catch(() => {}); // https에서만 동작
 songs = await dbAll().catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });
-songs.forEach((s) => { if (s.gender === '기본') s.gender = '원키'; }); // ponytail: 테스트 중 저장한 옛 이름 보정, 실사용 시작 전 삭제
 renderAll();

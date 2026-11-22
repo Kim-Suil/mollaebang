@@ -1,6 +1,6 @@
 // 실행: node test.mjs
 import assert from 'node:assert/strict';
-import { fmtKey, missingHint, groupSongs, wishList } from './logic.js';
+import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup } from './logic.js';
 
 assert.equal(fmtKey('원키', -2), '원키 -2');
 assert.equal(fmtKey('남키', 0), '남키 0');
@@ -39,5 +39,17 @@ assert.equal(missingHint({ title: ' ', cat: '', grade: '' }, 'wish'), '제목을
 // 불러볼 곡 목록: wish만, 최근 담은 순
 const w = (title, createdAt, status = 'wish') => ({ title, createdAt, status });
 assert.deepEqual(wishList([w('a', 1), w('b', 3), w('c', 2, 'mine')]).map((x) => x.title), ['b', 'a']);
+
+// 백업: 내보낸 걸 그대로 다시 읽을 수 있다
+const mine = { id: 'a', title: '좋은 날', artist: '', status: 'mine', cat: '발라드', grade: '잘함', gender: '원키', key: -2, memo: '' };
+const wish = { id: 'b', title: 'APT.', artist: '로제', status: 'wish', memo: '' };
+assert.deepEqual(parseBackup(JSON.stringify(makeBackup([mine, wish], 1))), [mine, wish]);
+const bad = (text, msg) => assert.throws(() => parseBackup(text), (e) => e.message.includes(msg));
+bad('not json', '읽을 수 없어요');
+bad('{"app":"other","songs":[]}', '몰래방 백업 파일이 아니에요');
+bad(JSON.stringify({ ...makeBackup([]), version: 99 }), '업데이트');
+bad(JSON.stringify(makeBackup([{ ...mine, grade: '' }])), '등급');
+bad(JSON.stringify(makeBackup([mine, mine])), 'id');
+bad(JSON.stringify(makeBackup([{ ...wish, title: ' ' }])), '제목');
 
 console.log('ok');
