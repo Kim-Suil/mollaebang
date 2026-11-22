@@ -564,6 +564,7 @@ const SWIPE = 88;
 let sw = null, lastSwipe = 0;
 const closeSwipes = (except) => document.querySelectorAll('.swipe-in.open').forEach((el) => el !== except && el.classList.remove('open'));
 document.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.swipe-del')) return; // 삭제 버튼을 누르는 중엔 줄을 닫지 않는다 (닫히면 탭이 곡 줄로 들어감)
   const el = e.target.closest('.swipe-in');
   closeSwipes(el);
   if (el) sw = { el, x: e.touches[0].clientX, y: e.touches[0].clientY, base: el.classList.contains('open') ? -SWIPE : 0, dx: 0, lock: null };

@@ -1,7 +1,7 @@
 // 서비스 워커: 앱 파일을 폰에 캐시해서 인터넷 없이도 열리게 한다.
 // ponytail: 캐시 우선 + 뒤에서 새 파일 받기. 새 버전은 "그다음 실행"부터 보인다.
 // 파일 목록이 바뀌면 CACHE 숫자를 올린다.
-const CACHE = 'karaoke-v13';
+const CACHE = 'karaoke-v14';
 const FILES = [
   './', 'index.html', 'app.js', 'logic.js', 'style.css', 'manifest.webmanifest',
   'fonts/Freesentation-500.woff2', 'fonts/Freesentation-700.woff2', 'fonts/Freesentation-900.woff2',
