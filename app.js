@@ -255,6 +255,12 @@ document.addEventListener('input', (e) => {
 $('#sort').addEventListener('change', (e) => { ui.sort = e.target.value; pref.set('sort', ui.sort); renderList(); });
 
 // ── 시작 ──
+// ponytail: iOS 26 홈 화면 앱에서 viewport가 화면보다 짧게 잡히는 버그 → 모자란 높이만큼 아래 요소를 내린다
+const fixGap = () => {
+  const g = navigator.standalone && innerWidth < innerHeight ? Math.max(0, Math.max(screen.width, screen.height) - innerHeight) : 0;
+  document.documentElement.style.setProperty('--gap', g + 'px');
+};
+fixGap(); addEventListener('resize', fixGap);
 navigator.storage?.persist?.(); // 저장 공간 유지 요청 (거절돼도 동작은 같음)
 navigator.serviceWorker?.register('sw.js').catch(() => {}); // https에서만 동작 (로컬 http 테스트에선 조용히 건너뜀)
 songs = await dbAll().catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });

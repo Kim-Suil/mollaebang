@@ -10,7 +10,11 @@
   --grade-good:#4F8CFF; --grade-mid:#B4B8C0; --grade-bad:#F2A54A;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:'Freesentation',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+/* ponytail: iOS 26 홈 화면 앱 버그(화면 아래가 viewport 밖으로 남음) 대응. --gap은 app.js가 잰다.
+   html 배경을 탭바 색으로 두어, 혹시 남는 띠도 탭바와 같은 색으로 보이게 함 */
+html{background:#121215}
+body{min-height:100vh;background:var(--bg)}
+html,body{margin:0;color:var(--ink);font-family:'Freesentation',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 .sr{position:absolute;left:-9999px}
@@ -47,8 +51,8 @@ button{cursor:pointer}
 .empty{padding:60px 20px;text-align:center;color:var(--muted);font-size:15px;font-weight:500;line-height:1.6}
 
 /* 시트 */
-.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10}
-.sheet{position:fixed;left:0;right:0;bottom:0;top:calc(env(safe-area-inset-top) + 12px);z-index:11;max-width:600px;margin:0 auto;border-radius:24px 24px 0 0;background:var(--sheet);display:flex;flex-direction:column}
+.sheet-bg{position:fixed;inset:0 0 calc(-1 * var(--gap, 0px));background:rgba(0,0,0,.6);z-index:10}
+.sheet{position:fixed;left:0;right:0;bottom:calc(-1 * var(--gap, 0px));top:calc(env(safe-area-inset-top) + 12px);z-index:11;max-width:600px;margin:0 auto;border-radius:24px 24px 0 0;background:var(--sheet);display:flex;flex-direction:column}
 .sheet-h{flex-shrink:0;height:56px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;padding:0 20px}
 .sheet-h h2{margin:0;text-align:center;font-size:17px;font-weight:900}
 .link{height:44px;border:none;background:transparent;color:var(--accent);font-size:17px;font-weight:500;padding:0}
@@ -71,7 +75,7 @@ textarea{height:96px;border:none;border-radius:16px;background:var(--field);font
 .danger{margin-top:40px;height:48px;border:none;border-radius:16px;background:transparent;color:var(--warn);font-size:16px;font-weight:700}
 
 /* 하단 탭 */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:grid;grid-template-columns:1fr 1fr;padding:8px 0 calc(env(safe-area-inset-bottom) + 6px);background:rgba(18,18,21,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
+.tabbar{position:fixed;left:0;right:0;bottom:calc(-1 * var(--gap, 0px));z-index:5;display:grid;grid-template-columns:1fr 1fr;padding:8px 0 calc(env(safe-area-inset-bottom) + 6px);background:rgba(18,18,21,.92);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid var(--line)}
 .tabbar button{border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:4px;color:#8A8E96;font-size:11px;font-weight:700;min-height:48px}
 .tabbar button[aria-current=true]{color:var(--accent)}
 .tabbar button[data-tab=wish][aria-current=true] svg{fill:currentColor}
