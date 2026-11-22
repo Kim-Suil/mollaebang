@@ -4,7 +4,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const clampKey = (k) => Math.max(KEY_MIN, Math.min(KEY_MAX, k));
-const ytUrl = (s) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${s.title} ${s.artist} 노래방`);
+const ytUrl = (s) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(`${s.title} ${s.artist} 노래방 악보`);
 const pref = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
