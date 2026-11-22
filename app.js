@@ -33,15 +33,21 @@ async function tx(stores, mode, fn) {
 }
 const dbAll = (store) => tx(store, 'readonly', (s) => s.getAll());
 const dbPut = (song) => tx('songs', 'readwrite', (s) => s.put(song));
-const dbPutRec = (r) => tx('recs', 'readwrite', (s) => s.put(r));
+// ponytail: 아이폰 사파리는 IndexedDB에 Blob을 못 넣는 버그가 있어서 ArrayBuffer(buf)+mime으로 저장한다
+const toStored = async ({ blob, ...r }) => ({ ...r, buf: await blob.arrayBuffer() });
+const fromStored = ({ buf, blob, ...r }) => ({ ...r, blob: blob || new Blob([buf], { type: r.mime }) });
+const dbPutRec = async (r) => { const x = await toStored(r); return tx('recs', 'readwrite', (s) => s.put(x)); };
 const dbDelRec = (id) => tx('recs', 'readwrite', (s) => s.delete(id));
 // 곡 삭제 = 곡 + 그 곡의 녹음을 한 번에
 const dbDel = (id) => tx(['songs', 'recs'], 'readwrite', (s, r) => { s.delete(id); recsOf(id).forEach((x) => r.delete(x.id)); });
 // 복원: 한 트랜잭션으로 비우고 다시 채운다. 중간에 실패하면 통째로 취소돼 기존 데이터가 남는다.
-const dbReplaceAll = (list, recList) => tx(['songs', 'recs'], 'readwrite', (s, r) => {
-  s.clear(); r.clear();
-  list.forEach((x) => s.put(x)); recList.forEach((x) => r.put(x));
-});
+const dbReplaceAll = async (list, recList) => {
+  const stored = await Promise.all(recList.map(toStored)); // 변환은 트랜잭션 밖에서 미리
+  return tx(['songs', 'recs'], 'readwrite', (s, r) => {
+    s.clear(); r.clear();
+    list.forEach((x) => s.put(x)); stored.forEach((x) => r.put(x));
+  });
+};
 
 // ── 상태 ──
 // 곡 하나 = 레코드 하나. status: 'wish'(불러볼 곡) → 'mine'(내 곡). 옮겨도 id·메모 유지.
@@ -439,7 +445,7 @@ async function finishRec() {
   const item = { id: newId(), songId: r.songId, at: r.start, dur, mime: blob.type, blob };
   try { await dbPutRec(item); } catch (e) {
     // 저장이 끝난 녹음만 목록에 넣는다. 기존 녹음은 그대로.
-    toast(e?.name === 'QuotaExceededError' ? '저장 공간이 부족해서 새 녹음을 저장하지 못했어요' : '새 녹음을 저장하지 못했어요');
+    toast(e?.name === 'QuotaExceededError' ? '저장 공간이 부족해서 새 녹음을 저장하지 못했어요' : `새 녹음을 저장하지 못했어요 (${e?.name || e})`);
     return renderDetail();
   }
   recs.push(item);
@@ -655,5 +661,5 @@ fixGap(); addEventListener('resize', fixGap);
 navigator.storage?.persist?.(); // 저장 공간 유지 요청 (거절돼도 동작은 같음)
 navigator.serviceWorker?.register('sw.js').catch(() => {}); // https에서만 동작
 songs = await dbAll('songs').catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });
-recs = await dbAll('recs').catch(() => { alert('녹음을 불러오지 못했어요.'); return []; });
+recs = (await dbAll('recs').catch(() => { alert('녹음을 불러오지 못했어요.'); return []; })).map(fromStored);
 renderAll();
