@@ -154,7 +154,7 @@ function renderDetail() {
   const yt = `<a class="card yt" href="${ytUrl(s)}" target="_blank" rel="noopener">${ICON.yt}유튜브에서 노래방 영상 검색</a>`;
   const memo = s.memo
     ? `<section class="card"><div class="card-h"><span>메모</span><span class="card-acts"><button data-act="memo">편집</button><button class="red" data-act="memo-del">삭제</button></span></div><p class="memo">${esc(s.memo)}</p></section>`
-    : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span><em>+ 추가</em></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
+    : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
 
   if (s.status === 'wish') {
     $('#detail').innerHTML = head('불러볼 곡', `<button class="link more" data-act="menu" aria-label="더보기">${ICON.more}</button>`)
