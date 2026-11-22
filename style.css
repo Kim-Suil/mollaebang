@@ -14,8 +14,8 @@
    html 배경을 탭바 색으로 두어, 혹시 남는 띠도 탭바와 같은 색으로 보이게 함 */
 html{background:#121215}
 body{min-height:100vh;background:var(--bg)}
-html,body{margin:0;color:var(--ink);font-family:'Freesentation',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
-button,input,select,textarea{font:inherit;color:inherit}
+html,body{margin:0;font-weight:500;color:var(--ink);font-family:'Freesentation',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;font-weight:500;color:inherit}
 button{cursor:pointer}
 .sr{position:absolute;left:-9999px}
 
@@ -31,10 +31,10 @@ button{cursor:pointer}
 .search input::placeholder{color:#6B6F77}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;padding:4px;border-radius:12px;background:var(--well)}
 .seg button{height:40px;border:none;border-radius:9px;background:transparent;color:var(--muted);font-size:15px;font-weight:700}
-.seg button[aria-pressed=true]{background:var(--thumb);color:var(--ink);font-weight:900}
+.seg button[aria-pressed=true]{background:var(--thumb);color:var(--ink)}
 .cats{margin:10px 20px 0;background:var(--field)}
 .cats button{height:36px}
-.cats button[aria-pressed=true]{background:#3A3C42}
+.cats button[aria-pressed=true]{background:#3A3C42;font-weight:900}
 .scope{padding:22px 20px 0;font-size:14px;font-weight:700;color:var(--muted)}
 .group-h{padding:26px 20px 6px;display:flex;align-items:center;gap:8px}
 .group-h .dot{width:8px;height:8px;border-radius:50%}
@@ -70,7 +70,9 @@ button{cursor:pointer}
 .stepper{display:flex;align-items:center;gap:6px}
 .stepper button{width:44px;height:44px;border:none;border-radius:12px;background:var(--accent-bg);color:var(--accent);font-size:22px;font-weight:900}
 .stepper b{width:44px;text-align:center;font-size:22px;font-weight:900;color:var(--accent)}
-.grades button[aria-pressed=true]{background:#B4B8C0;color:var(--bg)}
+.grades button[aria-pressed=true]{background:var(--grade-mid);color:var(--bg);font-weight:900}
+.grades button[aria-pressed=true][data-v=잘함]{background:var(--grade-good)}
+.grades button[aria-pressed=true][data-v=별로]{background:var(--grade-bad)}
 textarea{height:96px;border:none;border-radius:16px;background:var(--field);font-size:16px;padding:14px 16px;resize:none;outline:none}
 .hint{margin-top:8px;font-size:13px;font-weight:700;color:var(--warn)}
 .danger{margin-top:40px;height:48px;border:none;border-radius:16px;background:transparent;color:var(--warn);font-size:16px;font-weight:700}
@@ -92,7 +94,7 @@ textarea{height:96px;border:none;border-radius:16px;background:var(--field);font
 .d-title + .card{margin-top:22px}
 .card-h{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700}
 .card-h span{color:var(--muted)}
-.card-h b{color:var(--accent)}
+.card-h b{color:var(--accent);font-weight:700}
 .card-row{flex-direction:row;align-items:center;gap:14px;padding:14px 18px}
 .card-row > span{font-size:14px;font-weight:700;color:var(--muted);flex-shrink:0}
 .card-row .seg{flex:1}
@@ -196,3 +198,8 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 .pron-input{min-height:50vh;font-size:17px;line-height:1.6}
 .pron-input.sm{min-height:160px}
 .add-link{align-self:flex-start;margin-top:12px;height:44px;padding:0 4px;border:none;background:transparent;color:var(--accent);font-size:15px;font-weight:700}
+
+/* 캔버스 높이 맞춤 */
+.card .seg button{height:36px}
+.card-row .seg button{height:34px}
+.keyrow .seg button{height:36px}
