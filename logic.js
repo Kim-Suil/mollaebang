@@ -9,9 +9,10 @@ export const KEY_MIN = -12, KEY_MAX = 12;
 export const fmtNum = (k) => (k > 0 ? '+' : '') + k;
 export const fmtKey = (gender, key) => `${gender} ${fmtNum(key)}`;
 
-// 저장 불가 사유. 저장 가능하면 ''.
-export function missingHint(d) {
+// 저장 불가 사유. 저장 가능하면 ''. 불러볼 곡(wish)은 제목만 필수.
+export function missingHint(d, kind = 'mine') {
   if (!d.title.trim()) return '제목을 적어주세요';
+  if (kind === 'wish') return '';
   if (!d.cat && !d.grade) return '카테고리와 등급을 골라주세요';
   if (!d.cat) return '카테고리를 골라주세요';
   if (!d.grade) return '등급을 골라주세요';
@@ -33,3 +34,7 @@ export function groupSongs(songs, { cat, sort, query }) {
     .map((grade) => ({ grade, songs: picked.filter((s) => s.grade === grade).sort(cmp) }))
     .filter((g) => g.songs.length);
 }
+
+// 불러볼 곡: 최근에 담은 곡이 위로
+export const wishList = (songs) =>
+  songs.filter((s) => s.status === 'wish').sort((a, b) => b.createdAt - a.createdAt);

@@ -100,3 +100,39 @@ textarea{height:96px;border:none;border-radius:16px;background:var(--field);font
 .big-step b{font-size:44px;font-weight:900;color:var(--accent)}
 .yt{flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:0;height:52px;border-radius:16px;color:var(--ink);text-decoration:none;font-size:16px;font-weight:700}
 .memo{margin:-8px 0 0;font-size:15px;font-weight:500;line-height:1.5;color:#E4E5E8;white-space:pre-wrap}
+
+/* 불러볼 곡 */
+.top.col{flex-direction:column;align-items:flex-start}
+.sub{margin:6px 0 0;font-size:14px;font-weight:500;color:var(--muted)}
+.quick{margin:18px 16px 0;padding:6px;border-radius:18px;background:var(--card);display:flex;flex-direction:column}
+.quick input{height:44px;border:none;background:transparent;font-size:16px;padding:0 12px;outline:none;min-width:0}
+.quick > input{font-size:17px;font-weight:700;border-bottom:1px solid #222428}
+.quick-r{display:flex;align-items:center;gap:8px}
+.quick-r input{flex:1}
+#wsave{flex-shrink:0;width:72px;height:36px;border:none;border-radius:12px;background:var(--accent);color:var(--bg);font-size:15px;font-weight:900;white-space:nowrap}
+#wsave:disabled{background:var(--thumb);color:#6B6F77}
+.swipe{position:relative;overflow:hidden}
+.swipe-del{position:absolute;top:0;right:0;bottom:0;width:88px;border:none;background:var(--red);color:#fff;font-size:15px;font-weight:700}
+.swipe-in{position:relative;background:var(--bg);padding-left:20px;transition:transform .2s ease}
+.swipe-in.open{transform:translateX(-88px)}
+.wrow{padding-right:8px;gap:4px}
+button.row-t{align-self:stretch;justify-content:center;border:none;background:transparent;text-align:left;padding:0}
+.ico{width:44px;height:44px;flex-shrink:0;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.ico.chev{width:28px}
+
+/* 불러볼 곡 상세 */
+.more{width:44px;display:flex;align-items:center;justify-content:center}
+.d-gap{height:10px}
+.primary{display:block;width:calc(100% - 32px);height:56px;margin:24px 16px 0;border:none;border-radius:16px;background:var(--accent);color:var(--bg);font-size:17px;font-weight:900}
+.primary:disabled{background:var(--thumb);color:#6B6F77}
+.move-foot{margin-top:28px}
+.move-foot .primary{width:100%;margin:8px 0 0}
+.hint.center{text-align:center;font-size:14px;min-height:18px}
+
+/* ⋯ 메뉴 */
+.action{position:fixed;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px - var(--gap, 0px));z-index:11;max-width:584px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.action button{height:56px;border:none;background:#232428;font-size:17px;font-weight:700;color:var(--accent)}
+.action-g{display:flex;flex-direction:column;border-radius:14px;overflow:hidden}
+.action-g button + button{border-top:1px solid #303136}
+.action .red{color:#FF6B78}
+.action-cancel{border-radius:14px;font-weight:900!important}

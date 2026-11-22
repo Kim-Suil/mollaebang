@@ -1,6 +1,6 @@
 // 실행: node test.mjs
 import assert from 'node:assert/strict';
-import { fmtKey, missingHint, groupSongs } from './logic.js';
+import { fmtKey, missingHint, groupSongs, wishList } from './logic.js';
 
 assert.equal(fmtKey('원키', -2), '원키 -2');
 assert.equal(fmtKey('남키', 0), '남키 0');
@@ -32,5 +32,12 @@ assert.deepEqual(g[0].songs.map((x) => x.title), ['좋은 날', '밤양갱']);
 g = groupSongs(songs, { cat: '발라드', sort: '이름순', query: '로 제' });
 assert.deepEqual(g.flatMap((x) => x.songs.map((y) => y.title)), ['APT.']);
 assert.equal(groupSongs(songs, { cat: '랩', sort: '이름순', query: 'supernova' }).length, 0);
+
+// 불러볼 곡은 제목만 필수
+assert.equal(missingHint({ title: 'a', cat: '', grade: '' }, 'wish'), '');
+assert.equal(missingHint({ title: ' ', cat: '', grade: '' }, 'wish'), '제목을 적어주세요');
+// 불러볼 곡 목록: wish만, 최근 담은 순
+const w = (title, createdAt, status = 'wish') => ({ title, createdAt, status });
+assert.deepEqual(wishList([w('a', 1), w('b', 3), w('c', 2, 'mine')]).map((x) => x.title), ['b', 'a']);
 
 console.log('ok');
