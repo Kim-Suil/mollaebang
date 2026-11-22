@@ -1,6 +1,6 @@
 {
-  "name": "노래방",
-  "short_name": "노래방",
+  "name": "몰래방",
+  "short_name": "몰래방",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0B0B0D",
