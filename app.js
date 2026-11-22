@@ -285,6 +285,7 @@ function renderMenu() {
         <label class="set-btn">백업에서 복원<input type="file" id="importf" accept=".json,application/json" hidden></label>
       </div>
       <p class="set-note">곡은 이 폰에만 저장돼요. 내보낸 백업 파일은 "파일에 저장"으로 파일 앱(iCloud Drive 등)에 보관하세요.<br>복원하면 지금 곡이 백업 파일 내용으로 바뀌어요.</p>
+      <p class="set-note dim">화면 정보: ${gapInfo.screenH} / ${gapInfo.innerH} / ${gapInfo.fixedH} / ${gapInfo.gap}${navigator.standalone ? ' · 홈 화면 앱' : ''}</p>
     </div>
   </section>`;
     return;
@@ -715,11 +716,25 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && rec
 
 // ── 시작 ──
 // ponytail: iOS 26 홈 화면 앱에서 viewport가 화면보다 짧게 잡히는 버그 → 모자란 높이만큼 아래 요소를 내린다
+// innerHeight는 버그 상황에서 실제와 다르게 나올 때가 있어서, 화면 위아래에 붙인 투명 고정 상자의 실제 높이를 잰다.
+const probe = document.createElement('div');
+probe.style.cssText = 'position:fixed;top:0;bottom:0;left:0;width:1px;visibility:hidden;pointer-events:none';
+document.body.append(probe);
+const gapInfo = {};
 const fixGap = () => {
-  const g = navigator.standalone && innerWidth < innerHeight ? Math.max(0, Math.max(screen.width, screen.height) - innerHeight) : 0;
+  const fixedH = Math.round(probe.getBoundingClientRect().height);
+  const screenH = Math.max(screen.width, screen.height);
+  const portrait = innerWidth < innerHeight;
+  // ponytail: 상한 80px — 이상한 값이 나와도 탭바가 화면 밖으로 사라지지 않게
+  const g = navigator.standalone && portrait ? Math.min(80, Math.max(0, screenH - fixedH)) : 0;
+  Object.assign(gapInfo, { screenH, innerH: innerHeight, fixedH, gap: g });
   document.documentElement.style.setProperty('--gap', g + 'px');
 };
-fixGap(); addEventListener('resize', fixGap);
+fixGap();
+addEventListener('resize', fixGap);
+addEventListener('pageshow', fixGap);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fixGap, 300); });
+setTimeout(fixGap, 500); setTimeout(fixGap, 1500); // 실행 직후 높이가 바뀌는 경우 대비
 navigator.storage?.persist?.(); // 저장 공간 유지 요청 (거절돼도 동작은 같음)
 navigator.serviceWorker?.register('sw.js').catch(() => {}); // https에서만 동작
 songs = await dbAll('songs').catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });
