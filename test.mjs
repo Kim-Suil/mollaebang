@@ -1,6 +1,6 @@
 // 실행: node test.mjs
 import assert from 'node:assert/strict';
-import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav } from './logic.js';
+import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav, parsePron } from './logic.js';
 
 assert.equal(fmtKey('원키', -2), '원키 -2');
 assert.equal(fmtKey('남키', 0), '남키 0');
@@ -76,5 +76,15 @@ assert.equal(tag(0), 'RIFF'); assert.equal(tag(8), 'WAVE'); assert.equal(tag(36)
 assert.equal(wav.byteLength, 44 + 6);
 assert.equal(wav.getUint32(24, true), 24000);
 assert.deepEqual([wav.getInt16(44, true), wav.getInt16(46, true), wav.getInt16(48, true)], [0, 32767, -32768]);
+
+// 외국어 발음: 구간 제목 인식
+assert.deepEqual(parsePron('1절\n헤이 굿모닝\n\n렛츠 고\n후렴\n아이 필 소 굿\n[브릿지 2]\n올 나잇'), [
+  { title: '1절', lines: ['헤이 굿모닝', '렛츠 고'] },
+  { title: '후렴', lines: ['아이 필 소 굿'] },
+  { title: '브릿지 2', lines: ['올 나잇'] },
+]);
+assert.deepEqual(parsePron('제목 없이 바로\n시작'), [{ title: '', lines: ['제목 없이 바로', '시작'] }]);
+assert.deepEqual(parsePron(''), []);
+assert.deepEqual(parsePron(undefined), []);
 
 console.log('ok');

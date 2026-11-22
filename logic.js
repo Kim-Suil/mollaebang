@@ -111,3 +111,20 @@ export function encodeWav(samples, sampleRate) {
   samples.forEach((x, i) => { const c = Math.max(-1, Math.min(1, x)); v.setInt16(44 + i * 2, c < 0 ? c * 0x8000 : c * 0x7fff, true); });
   return buf;
 }
+
+// ── 외국어 발음 ──
+// 메모장에서 붙여넣은 글 → 구간들. "1절", "후렴" 같은 줄이나 [대괄호] 줄은 구간 제목이 된다.
+const SECTION = /^\[(.+)\]$|^(\d+\s*절|후렴|브릿지|인트로|아웃트로|훅|랩|코러스|프리코러스|간주)$/;
+export function parsePron(text) {
+  const out = [];
+  let cur = null;
+  for (const raw of (text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(SECTION);
+    if (m) { cur = { title: m[1] || m[2], lines: [] }; out.push(cur); continue; }
+    if (!cur) { cur = { title: '', lines: [] }; out.push(cur); }
+    cur.lines.push(line);
+  }
+  return out;
+}

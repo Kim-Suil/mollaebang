@@ -1,4 +1,4 @@
-import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav } from './logic.js';
+import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur, downsample, encodeWav, parsePron } from './logic.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -57,7 +57,7 @@ const recsOf = (songId) => recs.filter((r) => r.songId === songId).sort((a, b) =
 // 열려 있는 시트. mode: 'add'(내 곡 추가) | 'edit'(내 곡 편집) | 'wedit'(불러볼 곡 편집) | 'move'(내 곡에 저장)
 let draft = null;
 // tab: 'mine' | 'wish', open: 상세로 연 곡 id, menu: ⋯ 메뉴 열림
-const ui = { tab: 'mine', open: null, menu: false, settings: false, recMenu: null, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
+const ui = { tab: 'mine', open: null, pron: false, menu: false, settings: false, recMenu: null, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
 if (!SORTS.includes(ui.sort)) ui.sort = SORTS[0];
 const find = (id) => songs.find((s) => s.id === id);
 
@@ -196,19 +196,33 @@ function renderWish() {
 function renderDetail() {
   const s = find(ui.open);
   if (!s) { ui.open = null; return renderView(); }
+  if (ui.pron) {
+    const secs = parsePron(s.pron);
+    $('#detail').innerHTML = `
+  <div class="navbar">
+    <button class="link back" data-act="pron-back">${ICON.back}${esc(s.title)}</button>
+    <button class="link" data-act="pron-edit">편집</button>
+  </div>
+  <div class="d-title"><h1>외국어 발음</h1></div>
+  <div class="pron">${secs.map((sec) => `
+    <section>${sec.title ? `<h2>${esc(sec.title)}</h2>` : ''}${sec.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</section>`).join('')}
+  </div>`;
+    return;
+  }
   const head = (back, right) => `
   <div class="navbar">
     <button class="link back" data-act="back">${ICON.back}${back}</button>${right}
   </div>
   <div class="d-title"><h1>${esc(s.title)}</h1>${s.artist ? `<div>${esc(s.artist)}</div>` : ''}</div>`;
   const yt = `<a class="card yt" href="${ytUrl(s)}" target="_blank" rel="noopener">${ICON.yt}유튜브에서 노래방 영상 검색</a>`;
+  const pron = `<button class="card pron-row" data-act="${s.pron ? 'pron-open' : 'pron-edit'}"><span>외국어 발음</span><em class="${s.pron ? '' : 'dim'}">${s.pron ? '보기' : '추가'}${ICON.chev}</em></button>`;
   const memo = s.memo
     ? `<section class="card"><div class="card-h"><span>메모</span><span class="card-acts"><button data-act="memo">편집</button><button class="red" data-act="memo-del">삭제</button></span></div><p class="memo">${esc(s.memo)}</p></section>`
     : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
 
   if (s.status === 'wish') {
     $('#detail').innerHTML = head('불러볼 곡', `<button class="link more" data-act="menu" aria-label="더보기">${ICON.more}</button>`)
-      + `<div class="d-gap"></div>${yt}${memo}${recSection(s)}
+      + `<div class="d-gap"></div>${yt}${memo}${pron}${recSection(s)}
       <button class="primary" data-act="move">내 곡으로 옮기기</button>`;
     return;
   }
@@ -225,7 +239,7 @@ function renderDetail() {
     </div>
   </section>
   <section class="card card-row"><span>등급</span>${dpick('grade', GRADES, 'grades')}</section>
-  ${yt}${memo}${recSection(s)}`;
+  ${yt}${memo}${pron}${recSection(s)}`;
 }
 
 const recLabel = (at) => {
@@ -305,6 +319,23 @@ const kindOf = (d) => (d.mode === 'wedit' ? 'wish' : 'mine');
 function renderSheet() {
   document.body.style.overflow = draft ? 'hidden' : '';
   if (!draft) { $('#sheet').innerHTML = ''; return; }
+  if (draft.mode === 'pron') {
+    $('#sheet').innerHTML = `
+  <div class="sheet-bg" data-act="close"></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-label="외국어 발음">
+    <div class="sheet-h">
+      <button class="link" data-act="close">취소</button>
+      <h2>외국어 발음</h2>
+      <button class="link save" data-act="save">저장</button>
+    </div>
+    <div class="sheet-b">
+      <label class="sr" for="f-pron">외국어 발음</label>
+      <textarea id="f-pron" class="pron-input" data-f="pron" placeholder="1절\n헤이 굿모닝 에브리원\n\n후렴\n아이 필 소 굿">${esc(draft.pron)}</textarea>
+      <p class="set-note">메모장에 적어둔 걸 그대로 붙여넣으세요.<br>1절, 후렴, 2절, 브릿지처럼 구간 이름만 있는 줄이나 [대괄호] 줄은 구간 제목으로 보여요.<br>다 지우고 저장하면 외국어 발음이 삭제돼요.</p>
+    </div>
+  </section>`;
+    return;
+  }
   const hint = missingHint(draft, kindOf(draft));
   const name = { add: '곡 추가', edit: '곡 편집', wedit: '곡 편집', move: '내 곡에 저장' }[draft.mode];
   const isMove = draft.mode === 'move';
@@ -350,6 +381,7 @@ function renderSheet() {
 }
 
 function updateHint() {
+  if (draft.mode === 'pron') return;
   const hint = missingHint(draft, kindOf(draft));
   $('#hint').textContent = hint;
   $('#sheet [data-act=save]').disabled = !!hint;
@@ -366,6 +398,15 @@ function openSheet(mode, song) {
 
 // ── 저장·삭제 ──
 async function save() {
+  if (draft.mode === 'pron') {
+    const text = draft.pron.trim();
+    const id = draft.id;
+    await patchSong(id, { pron: text });
+    if (find(id).pron !== text) return; // 저장 실패 → 시트 유지
+    draft = null; ui.pron = !!text;
+    renderSheet(); renderDetail();
+    return;
+  }
   const kind = kindOf(draft);
   if (missingHint(draft, kind)) return;
   const now = Date.now();
@@ -606,8 +647,8 @@ document.addEventListener('click', (e) => {
   if (t.id === 'wsave') { e.preventDefault(); return quickAdd(); }
   if (t.dataset.play) return togglePlay(t.dataset.play);
   if (t.dataset.recmenu) { ui.recMenu = t.dataset.recmenu; return renderMenu(); }
-  if (t.dataset.tab) { stopRec(); ui.tab = t.dataset.tab; ui.open = null; window.scrollTo(0, 0); return renderView(); }
-  if (t.dataset.id) { ui.open = t.dataset.id; window.scrollTo(0, 0); return renderView(); }
+  if (t.dataset.tab) { stopRec(); ui.tab = t.dataset.tab; ui.open = null; ui.pron = false; window.scrollTo(0, 0); return renderView(); }
+  if (t.dataset.id) { ui.pron = false; ui.open = t.dataset.id; window.scrollTo(0, 0); return renderView(); }
   if (t.dataset.del) return remove(t.dataset.del);
   if (t.dataset.dpick) return patchOpen({ [t.dataset.dpick]: t.dataset.v });
   if (t.dataset.cat) { ui.cat = t.dataset.cat; pref.set('cat', ui.cat); ui.query = ''; $('#q').value = ''; return renderList(); }
@@ -616,6 +657,9 @@ document.addEventListener('click', (e) => {
   if (act === 'key') { draft.key = clampKey(draft.key + Number(t.dataset.v)); return renderSheet(); }
   if (act === 'dkey') return patchOpen({ key: clampKey(find(ui.open).key + Number(t.dataset.v)) });
   if (act === 'back') { stopRec(); ui.open = null; return renderView(); }
+  if (act === 'pron-open') { ui.pron = true; window.scrollTo(0, 0); return renderDetail(); }
+  if (act === 'pron-back') { ui.pron = false; return renderDetail(); }
+  if (act === 'pron-edit') { const s = find(ui.open); draft = { mode: 'pron', id: s.id, pron: s.pron || '' }; renderSheet(); return $('#f-pron').focus(); }
   if (act === 'rec-start') return startRec(ui.open);
   if (act === 'rec-stop') return stopRec();
   if (act === 'pin' || act === 'unpin') {

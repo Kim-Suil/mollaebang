@@ -183,3 +183,14 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 .rec-t em{font-style:normal;font-size:13px;color:var(--accent);margin-left:4px}
 .rec-t span{font-size:13px;font-weight:500;color:var(--muted)}
 .rec-note{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--muted)}
+
+/* 외국어 발음 */
+.pron-row{flex-direction:row;align-items:center;justify-content:space-between;width:calc(100% - 32px);padding:16px 18px;border:none;color:inherit;font-size:15px;font-weight:700;text-align:left}
+.pron-row span{color:var(--ink)}
+.pron-row em{display:flex;align-items:center;gap:2px;font-style:normal;font-size:14px;color:var(--accent)}
+.pron-row em.dim{color:var(--muted)}
+.pron{display:flex;flex-direction:column;gap:40px;padding:28px 24px 0}
+.pron section{display:flex;flex-direction:column;gap:10px}
+.pron h2{margin:0;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.02em}
+.pron p{margin:0;font-size:24px;font-weight:700;line-height:1.5;color:var(--ink);word-break:keep-all;overflow-wrap:anywhere}
+.pron-input{min-height:50vh;font-size:17px;line-height:1.6}
