@@ -425,7 +425,8 @@ async function startRec(songId) {
   mr.ondataavailable = (e) => e.data.size && rec?.chunks.push(e.data);
   mr.onstop = finishRec;
   mr.onerror = () => { toast('녹음 중 문제가 생겨서 멈췄어요'); };
-  mr.start(1000);
+  // ponytail: 조각(timeslice)으로 녹음하면 아이폰 mp4가 앞 몇 초만 재생돼서, 멈출 때 한 덩어리로 받는다
+  mr.start();
   rec.timer = setInterval(() => {
     const el = $('#rec-time');
     if (el && rec) el.textContent = fmtDur(Math.floor((Date.now() - rec.start) / 1000));
