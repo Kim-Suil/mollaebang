@@ -3,7 +3,7 @@ export const CATS = ['발라드', '신나는', '랩', '팝송'];
 export const GENDERS = ['남키', '원키', '여키'];
 export const GRADES = ['별로', '보통', '잘함'];       // 선택 버튼 순서
 export const GROUP_ORDER = ['잘함', '보통', '별로'];  // 목록 묶음 순서
-export const SORTS = ['이름순', '최근 추가순'];        // 최근 녹음순은 5단계(녹음)에서 추가
+export const SORTS = ['이름순', '최근 추가순', '최근 녹음순'];
 export const KEY_MIN = -12, KEY_MAX = 12;
 
 export const fmtNum = (k) => (k > 0 ? '+' : '') + k;
@@ -27,8 +27,8 @@ export function groupSongs(songs, { cat, sort, query }) {
   const picked = songs.filter((s) =>
     s.status === 'mine' &&
     (q ? norm(s.title + s.artist).includes(q) : s.cat === cat));
-  const cmp = sort === '최근 추가순'
-    ? (a, b) => b.mineAt - a.mineAt
+  const cmp = sort === '최근 추가순' ? (a, b) => b.mineAt - a.mineAt
+    : sort === '최근 녹음순' ? (a, b) => (b.lastRecAt || 0) - (a.lastRecAt || 0) // 녹음 없는 곡은 맨 아래
     : (a, b) => a.title.localeCompare(b.title, 'ko');
   return GROUP_ORDER
     .map((grade) => ({ grade, songs: picked.filter((s) => s.grade === grade).sort(cmp) }))
@@ -41,11 +41,12 @@ export const wishList = (songs) =>
 
 // ── 백업 ──
 // 형식 버전: 녹음이 들어가면 2로 올리고, 1도 계속 읽을 수 있게 한다.
-export const BACKUP_VERSION = 1;
-export const makeBackup = (songs, now = Date.now()) =>
-  ({ app: 'mollaebang', version: BACKUP_VERSION, exportedAt: now, songs });
+// v1: 곡만, v2: 곡 + 녹음(data: URL)
+export const BACKUP_VERSION = 2;
+export const makeBackup = (songs, recs = [], now = Date.now()) =>
+  ({ app: 'mollaebang', version: BACKUP_VERSION, exportedAt: now, songs, recs });
 
-// 백업 파일 텍스트 → 곡 목록. 문제가 있으면 사용자에게 보여줄 문장을 담아 throw.
+// 백업 파일 텍스트 → { songs, recs }. 문제가 있으면 사용자에게 보여줄 문장을 담아 throw.
 export function parseBackup(text) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error('백업 파일을 읽을 수 없어요'); }
@@ -64,5 +65,23 @@ export function parseBackup(text) {
       if (!GENDERS.includes(s.gender) || !Number.isInteger(s.key)) bad('키');
     }
   });
-  return data.songs;
+  const recs = data.version >= 2 ? data.recs : [];
+  if (!Array.isArray(recs)) throw new Error('백업 파일이 손상됐어요 (녹음 목록)');
+  const recIds = new Set();
+  recs.forEach((r, i) => {
+    const ok = r && typeof r.id === 'string' && r.id && !recIds.has(r.id) && ids.has(r.songId)
+      && Number.isFinite(r.at) && Number.isFinite(r.dur) && typeof r.mime === 'string'
+      && typeof r.data === 'string' && r.data.startsWith('data:');
+    if (!ok) throw new Error(`백업 파일이 손상됐어요 (${i + 1}번째 녹음)`);
+    recIds.add(r.id);
+  });
+  return { songs: data.songs, recs };
 }
+
+// 목록 ▶가 재생할 녹음: 대표로 고른 녹음, 없으면(지웠으면) 가장 최근 녹음
+export function pickRec(songRecs, pinId) {
+  return songRecs.find((r) => r.id === pinId)
+    || songRecs.reduce((a, b) => (!a || b.at > a.at ? b : a), null);
+}
+
+export const fmtDur = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;

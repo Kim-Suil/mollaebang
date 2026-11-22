@@ -1,4 +1,4 @@
-import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup } from './logic.js';
+import { CATS, GENDERS, GRADES, SORTS, KEY_MIN, KEY_MAX, fmtNum, fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur } from './logic.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -11,34 +11,47 @@ const pref = {
 };
 
 // ── IndexedDB ──
+// v1: songs, v2: + recs(녹음. blob을 그대로 저장)
 const dbp = new Promise((res, rej) => {
-  const r = indexedDB.open('karaoke', 1);
-  r.onupgradeneeded = () => r.result.createObjectStore('songs', { keyPath: 'id' });
+  const r = indexedDB.open('karaoke', 2);
+  r.onupgradeneeded = (e) => {
+    if (e.oldVersion < 1) r.result.createObjectStore('songs', { keyPath: 'id' });
+    if (e.oldVersion < 2) r.result.createObjectStore('recs', { keyPath: 'id' });
+  };
   r.onsuccess = () => res(r.result);
   r.onerror = () => rej(r.error);
 });
-async function tx(mode, fn) {
+// stores 순서대로 objectStore를 fn에 넘긴다. 트랜잭션이 끝나야(디스크에 써져야) resolve.
+async function tx(stores, mode, fn) {
   const db = await dbp;
   return new Promise((res, rej) => {
-    const t = db.transaction('songs', mode);
-    const req = fn(t.objectStore('songs'));
-    t.oncomplete = () => res(req.result);
+    const t = db.transaction(stores, mode);
+    const req = fn(...[].concat(stores).map((n) => t.objectStore(n)));
+    t.oncomplete = () => res(req?.result);
     t.onerror = t.onabort = () => rej(t.error);
   });
 }
-const dbAll = () => tx('readonly', (s) => s.getAll());
-const dbPut = (song) => tx('readwrite', (s) => s.put(song));
-const dbDel = (id) => tx('readwrite', (s) => s.delete(id));
+const dbAll = (store) => tx(store, 'readonly', (s) => s.getAll());
+const dbPut = (song) => tx('songs', 'readwrite', (s) => s.put(song));
+const dbPutRec = (r) => tx('recs', 'readwrite', (s) => s.put(r));
+const dbDelRec = (id) => tx('recs', 'readwrite', (s) => s.delete(id));
+// 곡 삭제 = 곡 + 그 곡의 녹음을 한 번에
+const dbDel = (id) => tx(['songs', 'recs'], 'readwrite', (s, r) => { s.delete(id); recsOf(id).forEach((x) => r.delete(x.id)); });
 // 복원: 한 트랜잭션으로 비우고 다시 채운다. 중간에 실패하면 통째로 취소돼 기존 데이터가 남는다.
-const dbReplaceAll = (list) => tx('readwrite', (s) => { s.clear(); list.forEach((x) => s.put(x)); return s.count(); });
+const dbReplaceAll = (list, recList) => tx(['songs', 'recs'], 'readwrite', (s, r) => {
+  s.clear(); r.clear();
+  list.forEach((x) => s.put(x)); recList.forEach((x) => r.put(x));
+});
 
 // ── 상태 ──
 // 곡 하나 = 레코드 하나. status: 'wish'(불러볼 곡) → 'mine'(내 곡). 옮겨도 id·메모 유지.
 let songs = [];
+let recs = []; // { id, songId, at, dur, mime, blob }
+const recsOf = (songId) => recs.filter((r) => r.songId === songId).sort((a, b) => b.at - a.at);
 // 열려 있는 시트. mode: 'add'(내 곡 추가) | 'edit'(내 곡 편집) | 'wedit'(불러볼 곡 편집) | 'move'(내 곡에 저장)
 let draft = null;
 // tab: 'mine' | 'wish', open: 상세로 연 곡 id, menu: ⋯ 메뉴 열림
-const ui = { tab: 'mine', open: null, menu: false, settings: false, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
+const ui = { tab: 'mine', open: null, menu: false, settings: false, recMenu: null, cat: pref.get('cat') || CATS[0], sort: pref.get('sort') || SORTS[0], query: '' };
 if (!SORTS.includes(ui.sort)) ui.sort = SORTS[0];
 const find = (id) => songs.find((s) => s.id === id);
 
@@ -52,6 +65,9 @@ const ICON = {
   more: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
   note: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
   heart: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>',
+  play: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  pause: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>',
+  noteSm: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
   yt: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/></svg>',
 };
 const GRADE_COLOR = { 잘함: 'var(--grade-good)', 보통: 'var(--grade-mid)', 별로: 'var(--grade-bad)' };
@@ -96,7 +112,8 @@ $('#app').innerHTML = `
 </nav>
 <div id="sheet"></div>
 <div id="menu"></div>
-<div id="toast" role="status" aria-live="polite"></div>`;
+<div id="toast" role="status" aria-live="polite"></div>
+<audio id="player" preload="none"></audio>`;
 
 let toastTimer;
 function toast(msg) {
@@ -118,7 +135,9 @@ function renderView() {
 function renderList() {
   $('#cats').innerHTML = CATS.map((c) =>
     `<button data-cat="${c}" aria-pressed="${!ui.query && c === ui.cat}">${c}</button>`).join('');
-  const groups = groupSongs(songs, ui);
+  const last = {};
+  recs.forEach((r) => { last[r.songId] = Math.max(last[r.songId] || 0, r.at); });
+  const groups = groupSongs(songs.map((s) => ({ ...s, lastRecAt: last[s.id] || 0 })), ui);
   const scope = ui.query ? '<div class="scope">내 곡 전체 검색 결과</div>' : '';
   if (!groups.length) {
     $('#list').innerHTML = scope + `<div class="empty">${ui.query ? '찾는 곡이 없어요' : `${ui.cat} 곡이 아직 없어요<br>오른쪽 위 + 로 추가해보세요`}</div>`;
@@ -130,14 +149,25 @@ function renderList() {
       <div class="swipe">
         <button class="swipe-del" data-del="${s.id}">삭제</button>
         <div class="swipe-in">
-          <button class="row" data-id="${s.id}">
-            <div class="row-in">
-              <div class="row-t"><b>${esc(s.title)}</b>${s.artist ? `<span>${esc(s.artist)}</span>` : ''}</div>
-              <div class="key"><span>${s.gender}</span><b>${fmtNum(s.key)}</b></div>
-            </div>
-          </button>
+          <div class="row-wrap">
+            ${coverBtn(s)}
+            <button class="row" data-id="${s.id}">
+              <div class="row-in">
+                <div class="row-t"><b>${esc(s.title)}</b>${s.artist ? `<span>${esc(s.artist)}</span>` : ''}</div>
+                <div class="key"><span>${s.gender}</span><b>${fmtNum(s.key)}</b></div>
+              </div>
+            </button>
+          </div>
         </div>
       </div>`).join('')}`).join('');
+}
+
+// 목록 왼쪽 앨범커버 자리: 녹음 있으면 ▶/⏸, 없으면 음표
+function coverBtn(s) {
+  const r = pickRec(recsOf(s.id), s.pinRec);
+  if (!r) return `<span class="cover" aria-hidden="true">${ICON.noteSm}</span>`;
+  const on = isPlaying(r.id);
+  return `<button class="cover on" data-play="${r.id}" aria-label="${esc(s.title)} 녹음 ${on ? '일시정지' : '재생'}">${on ? ICON.pause : ICON.play}</button>`;
 }
 
 function renderWish() {
@@ -172,7 +202,7 @@ function renderDetail() {
 
   if (s.status === 'wish') {
     $('#detail').innerHTML = head('불러볼 곡', `<button class="link more" data-act="menu" aria-label="더보기">${ICON.more}</button>`)
-      + `<div class="d-gap"></div>${yt}${memo}
+      + `<div class="d-gap"></div>${yt}${memo}${recSection(s)}
       <button class="primary" data-act="move">내 곡으로 옮기기</button>`;
     return;
   }
@@ -189,7 +219,31 @@ function renderDetail() {
     </div>
   </section>
   <section class="card card-row"><span>등급</span>${dpick('grade', GRADES, 'grades')}</section>
-  ${yt}${memo}`;
+  ${yt}${memo}${recSection(s)}`;
+}
+
+const recLabel = (at) => {
+  const d = new Date(at);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })}`;
+};
+function recSection(s) {
+  const list = recsOf(s.id);
+  const pin = pickRec(list, s.pinRec);
+  const busy = rec && rec.songId === s.id;
+  return `
+  <div class="sec-h"><b>녹음</b><span>${list.length}개</span></div>
+  <div class="card recs">
+    <button class="rec-row rec-new${busy ? ' busy' : ''}" data-act="${busy ? 'rec-stop' : 'rec-start'}" ${rec && !busy ? 'disabled' : ''}>
+      <span class="rec-dot"><i></i></span>
+      <span>${busy ? `녹음 중 <b id="rec-time">${fmtDur(Math.floor((Date.now() - rec.start) / 1000))}</b> · 눌러서 멈추기` : '새로 녹음하기'}</span>
+    </button>
+    ${list.map((r) => `
+    <div class="rec-row">
+      <button class="play" data-play="${r.id}" aria-label="${isPlaying(r.id) ? '일시정지' : '재생'}">${isPlaying(r.id) ? ICON.pause : ICON.play}</button>
+      <div class="rec-t"><b>${recLabel(r.at)}${list.length > 1 && r === pin && s.pinRec === r.id ? ' <em>대표</em>' : ''}</b><span>${fmtDur(r.dur)}</span></div>
+      <button class="ico" data-recmenu="${r.id}" aria-label="녹음 메뉴">${ICON.more}</button>
+    </div>`).join('')}
+  </div>`;
 }
 
 function renderMenu() {
@@ -211,6 +265,20 @@ function renderMenu() {
       <p class="set-note">곡은 이 폰에만 저장돼요. 내보낸 백업 파일은 "파일에 저장"으로 파일 앱(iCloud Drive 등)에 보관하세요.<br>복원하면 지금 곡이 백업 파일 내용으로 바뀌어요.</p>
     </div>
   </section>`;
+    return;
+  }
+  if (ui.recMenu) {
+    const r = recs.find((x) => x.id === ui.recMenu);
+    const pinned = find(r.songId).pinRec === r.id;
+    $('#menu').innerHTML = `
+  <div class="sheet-bg" data-act="menu-close"></div>
+  <div class="action" role="dialog" aria-modal="true" aria-label="녹음 메뉴">
+    <div class="action-g">
+      <button data-act="${pinned ? 'unpin' : 'pin'}">${pinned ? '대표 녹음 해제' : '목록에서 재생할 녹음으로 지정'}</button>
+      <button class="red" data-act="rec-del">녹음 삭제</button>
+    </div>
+    <button class="action-cancel" data-act="menu-close">취소</button>
+  </div>`;
     return;
   }
   $('#menu').innerHTML = ui.menu ? `
@@ -267,6 +335,7 @@ function renderSheet() {
       ${draft.mode === 'edit' ? '<button class="danger" data-act="delete">곡 삭제</button>' : ''}
       ${isMove ? `
       <div class="move-foot">
+        ${recsOf(draft.id).length ? `<div class="rec-note"><span class="rec-dot sm"><i></i></span>녹음 ${recsOf(draft.id).length}개도 함께 저장돼요</div>` : ''}
         <div class="hint center" id="hint" aria-live="polite">${hint}</div>
         <button class="primary" data-act="save" ${hint ? 'disabled' : ''}>내 곡에 저장</button>
       </div>` : ''}
@@ -319,19 +388,117 @@ async function save() {
 
 async function remove(id) {
   const s = find(id);
-  if (!confirm(`'${s.title}' 곡을 지울까요?`)) return false;
+  const n = recsOf(id).length;
+  if (!confirm(`'${s.title}' 곡을 지울까요?${n ? `\n녹음 ${n}개도 함께 지워져요.` : ''}`)) return false;
   try { await dbDel(id); } catch { alert('지우지 못했어요.'); return false; }
+  if (recsOf(id).some((r) => r.id === player.dataset.rec)) { player.pause(); player.removeAttribute('src'); delete player.dataset.rec; }
   songs = songs.filter((x) => x.id !== id);
+  recs = recs.filter((r) => r.songId !== id);
   if (ui.open === id) ui.open = null;
   draft = null; ui.menu = false;
   renderSheet(); renderMenu(); renderAll();
   return true;
 }
 
+// ── 녹음 ──
+let rec = null; // 녹음 중: { mr, chunks, start, songId, stream, timer }
+async function startRec(songId) {
+  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) return alert('이 기기에서는 녹음을 쓸 수 없어요.');
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) {
+    alert(e.name === 'NotAllowedError'
+      ? '마이크 권한이 꺼져 있어요.\n아이폰 설정 › 앱 › Safari › 마이크에서 허용한 뒤 다시 눌러주세요.'
+      : '마이크를 켜지 못했어요. 다시 시도해주세요.');
+    return;
+  }
+  player.pause();
+  // 기기가 지원하는 형식으로 녹음하고, 실제 형식(mime)을 같이 저장한다
+  const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported(t));
+  const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  rec = { mr, chunks: [], start: Date.now(), songId, stream };
+  mr.ondataavailable = (e) => e.data.size && rec?.chunks.push(e.data);
+  mr.onstop = finishRec;
+  mr.onerror = () => { toast('녹음 중 문제가 생겨서 멈췄어요'); };
+  mr.start(1000);
+  rec.timer = setInterval(() => {
+    const el = $('#rec-time');
+    if (el && rec) el.textContent = fmtDur(Math.floor((Date.now() - rec.start) / 1000));
+  }, 500);
+  renderDetail();
+}
+const stopRec = () => { if (rec && rec.mr.state !== 'inactive') rec.mr.stop(); };
+
+async function finishRec() {
+  const r = rec;
+  rec = null;
+  clearInterval(r.timer);
+  r.stream.getTracks().forEach((t) => t.stop());
+  const dur = Math.round((Date.now() - r.start) / 1000);
+  if (!r.chunks.length || dur < 1) { renderDetail(); return toast('녹음이 너무 짧아서 저장하지 않았어요'); }
+  const blob = new Blob(r.chunks, { type: r.mr.mimeType || r.chunks[0].type });
+  const item = { id: newId(), songId: r.songId, at: r.start, dur, mime: blob.type, blob };
+  try { await dbPutRec(item); } catch (e) {
+    // 저장이 끝난 녹음만 목록에 넣는다. 기존 녹음은 그대로.
+    toast(e?.name === 'QuotaExceededError' ? '저장 공간이 부족해서 새 녹음을 저장하지 못했어요' : '새 녹음을 저장하지 못했어요');
+    return renderDetail();
+  }
+  recs.push(item);
+  renderDetail(); renderList();
+  toast(r.cut ? '앱을 벗어나서 녹음을 멈추고 저장했어요' : '녹음을 저장했어요');
+}
+
+async function deleteRec(id) {
+  const r = recs.find((x) => x.id === id);
+  if (!confirm(`${recLabel(r.at)} 녹음을 지울까요?`)) return;
+  try { await dbDelRec(id); } catch { alert('지우지 못했어요.'); return; }
+  if (player.dataset.rec === id) { player.pause(); player.removeAttribute('src'); delete player.dataset.rec; }
+  recs = recs.filter((x) => x.id !== id);
+  const s = find(r.songId);
+  if (s.pinRec === id) await patchSong(s.id, { pinRec: null }); // 대표가 지워지면 최신 녹음으로
+  ui.recMenu = null;
+  renderMenu(); renderDetail(); renderList();
+}
+
+// ── 재생 (한 번에 하나) ──
+const player = $('#player');
+const isPlaying = (recId) => player.dataset.rec === recId && !player.paused;
+let playUrl = null;
+function togglePlay(recId) {
+  if (rec) return; // 녹음 중엔 재생 안 함
+  if (player.dataset.rec === recId) { player.paused ? player.play() : player.pause(); return; }
+  const r = recs.find((x) => x.id === recId);
+  const s = find(r.songId);
+  if (playUrl) URL.revokeObjectURL(playUrl);
+  playUrl = URL.createObjectURL(r.blob);
+  player.src = playUrl;
+  player.dataset.rec = recId;
+  player.play().catch(() => toast('재생하지 못했어요'));
+  // 잠금 화면·제어 센터에 곡 정보 표시
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: s.title, artist: `${s.artist ? s.artist + ' · ' : ''}${recLabel(r.at)} 녹음`, album: '몰래방',
+      artwork: [{ src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
+    });
+  }
+}
+const onPlayState = () => { renderList(); if (ui.open) renderDetail(); };
+player.addEventListener('play', onPlayState);
+player.addEventListener('pause', onPlayState);
+player.addEventListener('ended', onPlayState);
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play', () => player.play());
+  navigator.mediaSession.setActionHandler('pause', () => player.pause());
+}
+
 // ── 백업 ──
 async function exportBackup() {
   const name = `몰래방-백업-${new Date().toLocaleDateString('sv-SE')}.json`;
-  const file = new File([JSON.stringify(makeBackup(songs))], name, { type: 'application/json' });
+  const toDataUrl = (blob) => new Promise((res, rej) => {
+    const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob);
+  });
+  let recData;
+  try { recData = await Promise.all(recs.map(async ({ blob, ...r }) => ({ ...r, data: await toDataUrl(blob) }))); } catch { alert('녹음을 백업 파일로 만들지 못했어요.'); return; }
+  const file = new File([JSON.stringify(makeBackup(songs, recData))], name, { type: 'application/json' });
   try {
     if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
     else {
@@ -348,14 +515,19 @@ async function exportBackup() {
 }
 
 async function importBackup(file) {
-  let list;
-  try { list = parseBackup(await file.text()); } catch (e) { alert(`${e.message}\n지금 곡은 그대로예요.`); return; }
-  if (!confirm(`지금 곡 ${songs.length}개가 백업의 곡 ${list.length}개로 바뀌어요.\n복원할까요?`)) return;
-  try { await dbReplaceAll(list); } catch { alert('복원하지 못했어요. 지금 곡은 그대로예요.'); return; }
-  songs = list;
+  let list, recList;
+  try {
+    const data = parseBackup(await file.text());
+    list = data.songs;
+    recList = await Promise.all(data.recs.map(async ({ data: url, ...r }) => ({ ...r, blob: await (await fetch(url)).blob() })));
+  } catch (e) { alert(`${e.message || '백업 파일을 읽을 수 없어요'}\n지금 곡은 그대로예요.`); return; }
+  if (!confirm(`지금 곡 ${songs.length}개(녹음 ${recs.length}개)가 백업의 곡 ${list.length}개(녹음 ${recList.length}개)로 바뀌어요.\n복원할까요?`)) return;
+  try { await dbReplaceAll(list, recList); } catch { alert('복원하지 못했어요. 지금 곡은 그대로예요.'); return; }
+  player.pause(); player.removeAttribute('src'); delete player.dataset.rec;
+  songs = list; recs = recList;
   ui.open = null; ui.settings = false;
   renderMenu(); renderAll();
-  alert(`곡 ${list.length}개를 복원했어요.`);
+  alert(`곡 ${list.length}개, 녹음 ${recList.length}개를 복원했어요.`);
 }
 
 async function quickAdd() {
@@ -370,8 +542,9 @@ async function quickAdd() {
 }
 
 // 상세에서 바로 바꾼 값 저장 (내 곡의 키·등급)
-async function patchOpen(change) {
-  const next = { ...find(ui.open), ...change };
+const patchOpen = (change) => patchSong(ui.open, change);
+async function patchSong(id, change) {
+  const next = { ...find(id), ...change };
   try { await dbPut(next); } catch { alert('저장하지 못했어요.'); return; }
   songs = songs.map((x) => (x.id === next.id ? next : x));
   renderDetail(); renderList();
@@ -416,7 +589,9 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   if (t.id === 'add') return openSheet('add');
   if (t.id === 'wsave') { e.preventDefault(); return quickAdd(); }
-  if (t.dataset.tab) { ui.tab = t.dataset.tab; ui.open = null; window.scrollTo(0, 0); return renderView(); }
+  if (t.dataset.play) return togglePlay(t.dataset.play);
+  if (t.dataset.recmenu) { ui.recMenu = t.dataset.recmenu; return renderMenu(); }
+  if (t.dataset.tab) { stopRec(); ui.tab = t.dataset.tab; ui.open = null; window.scrollTo(0, 0); return renderView(); }
   if (t.dataset.id) { ui.open = t.dataset.id; window.scrollTo(0, 0); return renderView(); }
   if (t.dataset.del) return remove(t.dataset.del);
   if (t.dataset.dpick) return patchOpen({ [t.dataset.dpick]: t.dataset.v });
@@ -425,7 +600,16 @@ document.addEventListener('click', (e) => {
   const act = t.dataset.act;
   if (act === 'key') { draft.key = clampKey(draft.key + Number(t.dataset.v)); return renderSheet(); }
   if (act === 'dkey') return patchOpen({ key: clampKey(find(ui.open).key + Number(t.dataset.v)) });
-  if (act === 'back') { ui.open = null; return renderView(); }
+  if (act === 'back') { stopRec(); ui.open = null; return renderView(); }
+  if (act === 'rec-start') return startRec(ui.open);
+  if (act === 'rec-stop') return stopRec();
+  if (act === 'pin' || act === 'unpin') {
+    const r = recs.find((x) => x.id === ui.recMenu);
+    ui.recMenu = null; renderMenu();
+    patchSong(r.songId, { pinRec: act === 'pin' ? r.id : null });
+    return toast(act === 'pin' ? '목록 ▶에서 이 녹음을 재생해요' : '목록 ▶에서 최신 녹음을 재생해요');
+  }
+  if (act === 'rec-del') return deleteRec(ui.recMenu);
   if (act === 'edit') return openSheet('edit', find(ui.open));
   if (act === 'move') return openSheet('move', find(ui.open));
   if (act === 'memo-del') { if (confirm('메모를 지울까요?')) patchOpen({ memo: '' }); return; }
@@ -434,7 +618,7 @@ document.addEventListener('click', (e) => {
   if (act === 'settings') { ui.settings = true; return renderMenu(); }
   if (act === 'set-close') { ui.settings = false; return renderMenu(); }
   if (act === 'export') return exportBackup();
-  if (act === 'menu-close') { ui.menu = false; return renderMenu(); }
+  if (act === 'menu-close') { ui.menu = false; ui.recMenu = null; return renderMenu(); }
   if (act === 'wedit') { ui.menu = false; renderMenu(); return openSheet('wedit', find(ui.open)); }
   if (act === 'wdel') return remove(ui.open);
   if (act === 'close') { draft = null; return renderSheet(); }
@@ -458,6 +642,9 @@ document.addEventListener('change', (e) => {
 });
 $('#sort').addEventListener('change', (e) => { ui.sort = e.target.value; pref.set('sort', ui.sort); renderList(); });
 
+// 앱을 벗어나면 iOS가 마이크를 끊으므로, 그때까지 녹음한 걸 저장한다
+document.addEventListener('visibilitychange', () => { if (document.hidden && rec) { rec.cut = true; stopRec(); } });
+
 // ── 시작 ──
 // ponytail: iOS 26 홈 화면 앱에서 viewport가 화면보다 짧게 잡히는 버그 → 모자란 높이만큼 아래 요소를 내린다
 const fixGap = () => {
@@ -467,5 +654,6 @@ const fixGap = () => {
 fixGap(); addEventListener('resize', fixGap);
 navigator.storage?.persist?.(); // 저장 공간 유지 요청 (거절돼도 동작은 같음)
 navigator.serviceWorker?.register('sw.js').catch(() => {}); // https에서만 동작
-songs = await dbAll().catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });
+songs = await dbAll('songs').catch(() => { alert('저장된 곡을 불러오지 못했어요.'); return []; });
+recs = await dbAll('recs').catch(() => { alert('녹음을 불러오지 못했어요.'); return []; });
 renderAll();

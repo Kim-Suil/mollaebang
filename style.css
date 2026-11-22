@@ -155,4 +155,31 @@ button.row-t{align-self:stretch;justify-content:center;border:none;background:tr
 #toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 84px - var(--gap, 0px));z-index:20;max-width:568px;margin:0 auto;padding:14px 16px;border-radius:14px;background:#2A2C31;color:var(--ink);font-size:15px;font-weight:700;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}
 #toast.show{opacity:1;transform:none}
 
-.swipe-in > .row{padding-left:0}
+.swipe-in > .row-wrap{display:flex;align-items:center;gap:12px}
+.swipe-in .row{flex:1;min-width:0;padding-left:0}
+
+/* 목록 앨범커버 자리 */
+.cover{width:44px;height:44px;flex-shrink:0;border:none;border-radius:10px;background:var(--field);display:flex;align-items:center;justify-content:center;color:#5C6068}
+.cover.on{background:var(--accent-bg);color:var(--accent)}
+
+/* 녹음 */
+.sec-h{display:flex;align-items:center;justify-content:space-between;padding:22px 20px 0}
+.sec-h b{font-size:20px;font-weight:900}
+.sec-h span{font-size:14px;font-weight:700;color:var(--muted)}
+.recs{padding:0;gap:0;overflow:hidden}
+.rec-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:none;border-bottom:1px solid #222428;background:transparent;text-align:left;color:var(--ink);font-size:15px;font-weight:700}
+.rec-row:last-child{border-bottom:none}
+.rec-new{color:#FF6B78}
+.rec-new:disabled{opacity:.4}
+.rec-new b{font-variant-numeric:tabular-nums}
+.rec-dot{width:40px;height:40px;flex-shrink:0;border-radius:50%;border:2px solid var(--ink);display:flex;align-items:center;justify-content:center}
+.rec-dot i{width:28px;height:28px;border-radius:50%;background:var(--red);transition:all .2s}
+.busy .rec-dot i{width:16px;height:16px;border-radius:4px}
+.rec-dot.sm{width:14px;height:14px;border:none}
+.rec-dot.sm i{width:8px;height:8px}
+.play{width:40px;height:40px;flex-shrink:0;border:none;border-radius:50%;background:var(--thumb);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.rec-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rec-t b{font-size:15px;font-weight:700}
+.rec-t em{font-style:normal;font-size:13px;color:var(--accent);margin-left:4px}
+.rec-t span{font-size:13px;font-weight:500;color:var(--muted)}
+.rec-note{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;font-size:14px;font-weight:700;color:var(--muted)}

@@ -1,6 +1,6 @@
 // 실행: node test.mjs
 import assert from 'node:assert/strict';
-import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup } from './logic.js';
+import { fmtKey, missingHint, groupSongs, wishList, makeBackup, parseBackup, pickRec, fmtDur } from './logic.js';
 
 assert.equal(fmtKey('원키', -2), '원키 -2');
 assert.equal(fmtKey('남키', 0), '남키 0');
@@ -43,7 +43,11 @@ assert.deepEqual(wishList([w('a', 1), w('b', 3), w('c', 2, 'mine')]).map((x) => 
 // 백업: 내보낸 걸 그대로 다시 읽을 수 있다
 const mine = { id: 'a', title: '좋은 날', artist: '', status: 'mine', cat: '발라드', grade: '잘함', gender: '원키', key: -2, memo: '' };
 const wish = { id: 'b', title: 'APT.', artist: '로제', status: 'wish', memo: '' };
-assert.deepEqual(parseBackup(JSON.stringify(makeBackup([mine, wish], 1))), [mine, wish]);
+const rec = { id: 'r1', songId: 'a', at: 5, dur: 3, mime: 'audio/mp4', data: 'data:audio/mp4;base64,AAAA' };
+assert.deepEqual(parseBackup(JSON.stringify(makeBackup([mine, wish], [rec], 1))), { songs: [mine, wish], recs: [rec] });
+// v1 백업(녹음 없음)도 읽는다
+assert.deepEqual(parseBackup(JSON.stringify({ app: 'mollaebang', version: 1, songs: [wish] })), { songs: [wish], recs: [] });
+assert.throws(() => parseBackup(JSON.stringify(makeBackup([mine], [{ ...rec, songId: 'nope' }]))), /1번째 녹음/);
 const bad = (text, msg) => assert.throws(() => parseBackup(text), (e) => e.message.includes(msg));
 bad('not json', '읽을 수 없어요');
 bad('{"app":"other","songs":[]}', '몰래방 백업 파일이 아니에요');
@@ -51,5 +55,16 @@ bad(JSON.stringify({ ...makeBackup([]), version: 99 }), '업데이트');
 bad(JSON.stringify(makeBackup([{ ...mine, grade: '' }])), '등급');
 bad(JSON.stringify(makeBackup([mine, mine])), 'id');
 bad(JSON.stringify(makeBackup([{ ...wish, title: ' ' }])), '제목');
+
+// 최근 녹음순: 녹음 없는 곡은 맨 아래
+const r = (title, lastRecAt) => ({ title, artist: '', cat: '랩', grade: '보통', status: 'mine', mineAt: 0, lastRecAt });
+assert.deepEqual(groupSongs([r('a', 0), r('b', 5), r('c', 9)], { cat: '랩', sort: '최근 녹음순', query: '' })[0].songs.map((x) => x.title), ['c', 'b', 'a']);
+// 대표 녹음 > 최신 녹음
+const recs = [{ id: 'x', at: 1 }, { id: 'y', at: 3 }, { id: 'z', at: 2 }];
+assert.equal(pickRec(recs, 'x').id, 'x');
+assert.equal(pickRec(recs, 'gone').id, 'y');
+assert.equal(pickRec([], undefined), null);
+assert.equal(fmtDur(222), '3:42');
+assert.equal(fmtDur(5), '0:05');
 
 console.log('ok');
