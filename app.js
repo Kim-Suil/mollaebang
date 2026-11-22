@@ -153,7 +153,7 @@ function renderDetail() {
   <div class="d-title"><h1>${esc(s.title)}</h1>${s.artist ? `<div>${esc(s.artist)}</div>` : ''}</div>`;
   const yt = `<a class="card yt" href="${ytUrl(s)}" target="_blank" rel="noopener">${ICON.yt}유튜브에서 노래방 영상 검색</a>`;
   const memo = s.memo
-    ? `<button class="card memo-card" data-act="memo"><div class="card-h"><span>메모</span><em>편집</em></div><p class="memo">${esc(s.memo)}</p></button>`
+    ? `<section class="card"><div class="card-h"><span>메모</span><span class="card-acts"><button data-act="memo">편집</button><button class="red" data-act="memo-del">삭제</button></span></div><p class="memo">${esc(s.memo)}</p></section>`
     : `<button class="card memo-card empty-memo" data-act="memo"><div class="card-h"><span>메모</span><em>+ 추가</em></div><p class="memo">최고음, 주의할 구간 등을 적어두세요</p></button>`;
 
   if (s.status === 'wish') {
@@ -414,6 +414,7 @@ document.addEventListener('click', (e) => {
   if (act === 'back') { ui.open = null; return renderView(); }
   if (act === 'edit') return openSheet('edit', find(ui.open));
   if (act === 'move') return openSheet('move', find(ui.open));
+  if (act === 'memo-del') { if (confirm('메모를 지울까요?')) patchOpen({ memo: '' }); return; }
   if (act === 'memo') { const s = find(ui.open); openSheet(s.status === 'wish' ? 'wedit' : 'edit', s); return $('#f-memo').focus(); }
   if (act === 'menu') { ui.menu = true; return renderMenu(); }
   if (act === 'settings') { ui.settings = true; return renderMenu(); }
